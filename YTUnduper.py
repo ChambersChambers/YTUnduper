@@ -30,12 +30,13 @@ def main():
 
 
     #TODO: Add input for ID, possibly strip from a given URL?
-    myPlaylistId="PLbg4rpCA3X3o4k0uIToFZKlvZY_VquWK6"
+    #myPlaylistId="PLbg4rpCA3X3o4k0uIToFZKlvZY_VquWK6"
+    myPlaylistId=input("\nInput Playlist ID: \n")
 
 
     #The lists of exisiting Video IDs and duplicate Playlist IDs
     #Video IDs are the IDs for the actual video (e.g. youtube.com/watch?v=YourIdHere)
-    #Playlist IDs are unique to each video in a playlist.
+    #Playlist IDs are unique to each video "entry" in a playlist.
     videoIdList=[]
     dupePlaylistIdList=[]
 
@@ -45,52 +46,63 @@ def main():
         maxResults=50,
         playlistId=myPlaylistId,
     )
-
-    #Do the request and get the next page token
     response = request.execute()
+
+
+    #Get the nextPageToken for the next request.
     myPageToken = response["nextPageToken"]
 
 
     #Get the amount of videos in the list so we can find out how many future requests we need to send in order to search the entire playlist.
     playlistVideoCount = response["pageInfo"]["totalResults"]
-    pageCount = math.ceil(playlistVideoCount/50)
-    print(pageCount)
+    pageCount = math.ceil(playlistVideoCount/50) #We search in batches of max 50 results.
+    print("\n", pageCount, " pages of videos found. \n")
 
-    #Iteration all across the nation
+
     i = 0
     vidcount = 0
-    while i < 30:
+    while i < pageCount:
         for key in response["items"]:
             playlist_id = key["id"]
             video_id = key["contentDetails"]["videoId"];
 
             if video_id in videoIdList:
                 dupePlaylistIdList.append(playlist_id)
-                print("Dupe detected! Playlist ID: ", playlist_id, ". Video ID: ")
+                print("Dupe detected! Playlist ID: ", playlist_id, "|| Video ID: ", video_id)
             else:
                 videoIdList.append(video_id)
         
-        request = youtube.playlistItems().list(
-            part="contentDetails",
-            maxResults=50,
-            playlistId=myPlaylistId,
-            pageToken=myPageToken,
-        )
-        
-        response = request.execute()
-        myPageToken = response["nextPageToken"]
+        if i != pageCount -1:
+            if "nextPageToken" in response:
+                 myPageToken = response["nextPageToken"]
+            else:
+                print("No more pages")
+                break
+
+            request = youtube.playlistItems().list(
+                part="contentDetails",
+                maxResults=50,
+                playlistId=myPlaylistId,
+                pageToken=myPageToken,
+            )
+            
+            response = request.execute()
+
         i+=1
         vidcount+=50
-        print(vidcount, "Videos Searched")
+        print("~", vidcount, " Videos Searched")
 
+    dupesLeft = len(dupePlaylistIdList)
     for dupVid in dupePlaylistIdList:
         request = youtube.playlistItems().delete(   
             id=dupVid
         )
         request.execute()
         print("Executing Delete Request for ID: ", dupVid)
-        print(len(dupePlaylistIdList), "dupes left.")
+        print(dupesLeft, "dupes left.")
+        dupesLeft-=1
 
+    print("\nDupes deleted. Have a nice day!")
 
 if __name__ == "__main__":
     main()
